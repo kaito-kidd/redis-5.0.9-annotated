@@ -41,6 +41,7 @@
 
 const char *SDS_NOINIT = "SDS_NOINIT";
 
+/* 根据sds header类型 得到header的大小 */
 static inline int sdsHdrSize(char type) {
     switch(type&SDS_TYPE_MASK) {
         case SDS_TYPE_5:
@@ -57,6 +58,7 @@ static inline int sdsHdrSize(char type) {
     return 0;
 }
 
+/* 根据字符串长度 计算所需header类型 */
 static inline char sdsReqType(size_t string_size) {
     if (string_size < 1<<5)
         return SDS_TYPE_5;
@@ -86,12 +88,17 @@ static inline char sdsReqType(size_t string_size) {
  * You can print the string with printf() as there is an implicit \0 at the
  * end of the string. However the string is binary safe and can contain
  * \0 characters in the middle, as the length is stored in the sds header. */
+/* 创建一个sds 并指定长度 */
 sds sdsnewlen(const void *init, size_t initlen) {
     void *sh;
     sds s;
     char type = sdsReqType(initlen);
     /* Empty strings are usually created in order to append. Use type 8
      * since type 5 is not good at this. */
+    /*
+     * 空字符串使用header8存储 后面可能随时要填充内容
+     * header5不适合填充数据 会引发内存重新分配
+    */
     if (type == SDS_TYPE_5 && initlen == 0) type = SDS_TYPE_8;
     int hdrlen = sdsHdrSize(type);
     unsigned char *fp; /* flags pointer. */
@@ -100,6 +107,7 @@ sds sdsnewlen(const void *init, size_t initlen) {
     if (init==SDS_NOINIT)
         init = NULL;
     else if (!init)
+        /* init为NULL 使用全0填充字符数组 */
         memset(sh, 0, hdrlen+initlen+1);
     if (sh == NULL) return NULL;
     s = (char*)sh+hdrlen;
@@ -146,22 +154,26 @@ sds sdsnewlen(const void *init, size_t initlen) {
 
 /* Create an empty (zero length) sds string. Even in this case the string
  * always has an implicit null term. */
+/* 创建一个空sds 长度为0 */
 sds sdsempty(void) {
     return sdsnewlen("",0);
 }
 
 /* Create a new sds string starting from a null terminated C string. */
+/* 创建一个sds 长度自动计算 */
 sds sdsnew(const char *init) {
     size_t initlen = (init == NULL) ? 0 : strlen(init);
     return sdsnewlen(init, initlen);
 }
 
 /* Duplicate an sds string. */
+/* 拷贝一个sds */
 sds sdsdup(const sds s) {
     return sdsnewlen(s, sdslen(s));
 }
 
 /* Free an sds string. No operation is performed if 's' is NULL. */
+/* 释放sds header和数据部分一起释放 */
 void sdsfree(sds s) {
     if (s == NULL) return;
     s_free((char*)s-sdsHdrSize(s[-1]));
@@ -209,14 +221,18 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
     int hdrlen;
 
     /* Return ASAP if there is enough space left. */
+    /* 还有剩余空间 直接返回 不用重新分配空间 */
     if (avail >= addlen) return s;
 
     len = sdslen(s);
     sh = (char*)s-sdsHdrSize(oldtype);
     newlen = (len+addlen);
+    /* 空间不够 重新申请内存 */
+    /* 需要的内存小于1M 翻倍申请 */
     if (newlen < SDS_MAX_PREALLOC)
         newlen *= 2;
     else
+        /* 需要大于1M的内存 那就先申请1M */
         newlen += SDS_MAX_PREALLOC;
 
     type = sdsReqType(newlen);
@@ -227,6 +243,8 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
     if (type == SDS_TYPE_5) type = SDS_TYPE_8;
 
     hdrlen = sdsHdrSize(type);
+    /* 旧的header可以存下 在原来的地址上分配新空间 */
+    /* 如果原地址不够 则分配新的内存 然后拷贝过去 s_realloc已做好了这些工作 */
     if (oldtype==type) {
         newsh = s_realloc(sh, hdrlen+newlen+1);
         if (newsh == NULL) return NULL;
@@ -234,6 +252,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
     } else {
         /* Since the header size changes, need to move the string forward,
          * and can't use realloc */
+        /* 旧的header存不下了 释放旧的sds 重新分配新的sds */
         newsh = s_malloc(hdrlen+newlen+1);
         if (newsh == NULL) return NULL;
         memcpy((char*)newsh+hdrlen, s, len+1);
@@ -252,6 +271,7 @@ sds sdsMakeRoomFor(sds s, size_t addlen) {
  *
  * After the call, the passed sds string is no longer valid and all the
  * references must be substituted with the new pointer returned by the call. */
+/* 重新给s分配len(s)的内存空间 把旧的s内存空间释放掉 */
 sds sdsRemoveFreeSpace(sds s) {
     void *sh, *newsh;
     char type, oldtype = s[-1] & SDS_TYPE_MASK;

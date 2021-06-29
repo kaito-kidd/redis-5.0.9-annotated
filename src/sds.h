@@ -42,6 +42,7 @@ extern const char *SDS_NOINIT;
 
 typedef char *sds;
 
+/* 不同长度sds的header */
 /* Note: sdshdr5 is never used, we just access the flags byte directly.
  * However is here to document the layout of type 5 SDS strings. */
 struct __attribute__ ((__packed__)) sdshdr5 {
@@ -84,6 +85,7 @@ struct __attribute__ ((__packed__)) sdshdr64 {
 #define SDS_HDR(T,s) ((struct sdshdr##T *)((s)-(sizeof(struct sdshdr##T))))
 #define SDS_TYPE_5_LEN(f) ((f)>>SDS_TYPE_BITS)
 
+/* 获取sds的长度 */
 static inline size_t sdslen(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -101,6 +103,7 @@ static inline size_t sdslen(const sds s) {
     return 0;
 }
 
+/* sds的剩余可用容量 alloc - len */
 static inline size_t sdsavail(const sds s) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -127,6 +130,7 @@ static inline size_t sdsavail(const sds s) {
     return 0;
 }
 
+/* 重设sds长度 */
 static inline void sdssetlen(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -151,6 +155,7 @@ static inline void sdssetlen(sds s, size_t newlen) {
     }
 }
 
+/* incr sds长度 */
 static inline void sdsinclen(sds s, size_t inc) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {
@@ -176,6 +181,7 @@ static inline void sdsinclen(sds s, size_t inc) {
     }
 }
 
+/* 获取sds的容量 */
 /* sdsalloc() = sdsavail() + sdslen() */
 static inline size_t sdsalloc(const sds s) {
     unsigned char flags = s[-1];
@@ -194,6 +200,7 @@ static inline size_t sdsalloc(const sds s) {
     return 0;
 }
 
+/* 重设sds的容量 */
 static inline void sdssetalloc(sds s, size_t newlen) {
     unsigned char flags = s[-1];
     switch(flags&SDS_TYPE_MASK) {

@@ -44,15 +44,16 @@
 /* Unused arguments generate annoying warnings... */
 #define DICT_NOTUSED(V) ((void) V)
 
+/* 哈希桶下的链表元素 */
 typedef struct dictEntry {
-    void *key;
-    union {
+    void *key;  /* key */
+    union {     /* value不确定 可能是int/double 也可能是指针 */
         void *val;
         uint64_t u64;
         int64_t s64;
         double d;
     } v;
-    struct dictEntry *next;
+    struct dictEntry *next; /* 指向下一个dictEntry 组成链表 */
 } dictEntry;
 
 typedef struct dictType {
@@ -66,25 +67,28 @@ typedef struct dictType {
 
 /* This is our hash table structure. Every dictionary has two of this as we
  * implement incremental rehashing, for the old to the new table. */
+/* 哈希表 */
 typedef struct dictht {
-    dictEntry **table;
-    unsigned long size;
-    unsigned long sizemask;
-    unsigned long used;
+    dictEntry **table;          
+    unsigned long size;         /* 哈希表有多大 */
+    unsigned long sizemask;     /* 用于计算key落到哪个桶 */
+    unsigned long used;         /* 整个哈希表有多少个元素 */
 } dictht;
 
+/* 封装好的dict 对外使用时 都是用这个封装好的结构体 */
 typedef struct dict {
     dictType *type;
     void *privdata;
-    dictht ht[2];
-    long rehashidx; /* rehashing not in progress if rehashidx == -1 */
-    unsigned long iterators; /* number of iterators currently running */
+    dictht ht[2];               /* 每个dict都有2个哈希表 ht[0]日常使用 ht[1]用于扩缩容使用 */
+    long rehashidx;             /* rehashidx != -1 说明正在 rehash */
+    unsigned long iterators;    /* 迭代哈希表时 记录迭代的游标 */
 } dict;
 
 /* If safe is set to 1 this is a safe iterator, that means, you can call
  * dictAdd, dictFind, and other functions against the dictionary even while
  * iterating. Otherwise it is a non safe iterator, and only dictNext()
  * should be called while iterating. */
+/* 迭代哈希表使用的迭代器 */
 typedef struct dictIterator {
     dict *d;
     long index;
@@ -98,6 +102,7 @@ typedef void (dictScanFunction)(void *privdata, const dictEntry *de);
 typedef void (dictScanBucketFunction)(void *privdata, dictEntry **bucketref);
 
 /* This is the initial size of every hash table */
+/* 初始化dict的大小 */
 #define DICT_HT_INITIAL_SIZE     4
 
 /* ------------------------------- Macros ------------------------------------*/
